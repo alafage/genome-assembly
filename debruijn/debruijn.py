@@ -149,29 +149,67 @@ def solve_bubble(graph, ancestor_node, descendant_node):
     graph = select_best_path(graph, paths, lenghts, weights)
     return graph
 
-def simplify_bubbles(graph):
-    def search_for_bubble(graph, nodes):
-        preds = []
+def search_for_ancestors(graph, currents, nodes):
+    preds = []
+    for current in currents:
+        preds += [pred for pred in graph.predecessors(current)]
+    nodes += preds
+    if len(set(nodes)) != len(nodes):
+        uniq = []
+        duplicate = []
         for node in nodes:
-            preds += [pred for pred in graph.predecessors(node)]
-        if len(set(preds)) != len(preds):
-            uniq = []
-            duplicate = []
-            for pred in preds:
-                if pred not in uniq:
-                    uniq.append(pred)
-                elif pred not in duplicate:
-                    duplicate.append(pred)
-            return duplicate
-        else:
-            return search_for_bubble(graph, preds)
-        
+            if node not in uniq:
+                uniq.append(node)
+            elif node not in duplicate:
+                duplicate.append(node)
+        return duplicate
+    else:
+        return search_for_ancestors(graph, preds, nodes)
+
+def search_for_common_descendant(graph, nodes, nb_branch):
+    succs = [node for node in nodes]
+    for node in nodes:
+        succs += [succ for succ in graph.successors(node)]
+    if len(set(succs)) != len(succs):
+        bearer = [
+            [] for _ in range(nb_branch)
+        ]
+        for succ in succs:
+            for matrix in bearer: 
+                if succ not in matrix:
+                    matrix.append(succ)
+                    break
+        return bearer[nb_branch-1] if len(bearer[nb_branch-1])>0 else search_for_common_descendant(graph, succs, nb_branch)
+    else:
+        return search_for_common_descendant(graph, succs, nb_branch)
+
+def search_for_common_ancestor(graph, nodes, nb_branch):
+    preds = [node for node in nodes]
+    for node in nodes:
+        preds += [pred for pred in graph.predecessors(node)]
+    if len(set(preds)) != len(preds):
+        bearer = [
+            [] for _ in range(nb_branch)
+        ]
+        for pred in preds:
+            for matrix in bearer: 
+                if pred not in matrix:
+                    matrix.append(pred)
+                    break
+        return bearer[nb_branch-1] if len(bearer[nb_branch-1])>0 else search_for_common_ancestor(graph, preds, nb_branch)
+    else:
+        return search_for_common_ancestor(graph, preds, nb_branch)
+
+def simplify_bubbles(graph):
+    # FIXME: should handle bubbles inside bubbles.
     nodes_to_check = [node for node, succs in graph.pred.items() if succs]
     nodes_to_check = [node for node in nodes_to_check if len([pred for pred in graph.predecessors(node)])>1]
     
     anc_des_list = []
     for node in nodes_to_check:
-        ancestors = search_for_bubble(graph, [node])
+        print(node)
+        ancestors = search_for_ancestors(graph, [node], [node])
+        print("ANC: ", ancestors)
         anc_des_list += [[anc, node] for anc in ancestors]
     
     for ancestor, descendant in anc_des_list:
@@ -180,11 +218,25 @@ def simplify_bubbles(graph):
     return graph
 
 def solve_entry_tips(graph, starting_nodes):
-    
-    pass
+    common_descendants = search_for_common_descendant(graph, starting_nodes, len(starting_nodes))
+    # FIXME: should handle multiple common descendants
+    common_descendant = common_descendants[0]
+    path_list = [[path for path in nx.all_simple_paths(graph, source=s_node, target=common_descendant)][0] for s_node in starting_nodes]
+    lenghts = [len(path)-1 for path in path_list]
+    weights = [path_average_weight(graph, path) for path in path_list]
+    graph = select_best_path(graph, path_list, lenghts, weights, delete_entry_node=True)
+    return graph
 
 def solve_out_tips(graph, ending_nodes):
-    pass
+    common_ancestors = search_for_common_ancestor(graph, ending_nodes, len(ending_nodes))
+    # FIXME: should handle multiple common ancestors
+    common_ancestor = common_ancestors[0]
+    print("ANC: ", common_ancestor)
+    path_list = [[path for path in nx.all_simple_paths(graph, source=common_ancestor, target=e_node)][0] for e_node in ending_nodes]
+    lenghts = [len(path)-1 for path in path_list]
+    weights = [path_average_weight(graph, path) for path in path_list]
+    graph = select_best_path(graph, path_list, lenghts, weights, delete_sink_node=True)
+    return graph
 
 def get_starting_nodes(graph):
     return [node for node, preds in graph.pred.items() if not preds]
