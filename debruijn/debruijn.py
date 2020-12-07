@@ -20,9 +20,10 @@ import networkx as nx
 import matplotlib
 from operator import itemgetter
 import random
-random.seed(9001)
 from random import randint
 import statistics
+random.seed(9001)
+
 
 __author__ = "Your Name"
 __copyright__ = "Universite Paris Diderot"
@@ -66,19 +67,35 @@ def get_arguments():
 
 
 def read_fastq(fastq_file):
-    pass
+    with open(fastq_file, 'r') as fastq_file:
+        for _ in fastq_file:
+            yield next(fastq_file)[:-1]  # remove '\n' character
+            next(fastq_file)  # skip useless line
+            next(fastq_file)  # skip useless line
 
 
 def cut_kmer(read, kmer_size):
-    pass
+    for kmer in [read[i:i+kmer_size] for i in range(0, len(read)-kmer_size+1)]:
+        yield kmer
 
 
 def build_kmer_dict(fastq_file, kmer_size):
-    pass
+    kmer_dict = {}
+    for sequence in read_fastq(fastq_file):
+        for kmer in cut_kmer(sequence, kmer_size):
+            if kmer not in kmer_dict.keys():
+                kmer_dict[kmer] = 1
+            else:
+                kmer_dict[kmer] += 1
+    return kmer_dict
 
 
 def build_graph(kmer_dict):
-    pass
+    construct = [(key[:-1], key[1:], value) for key, value in kmer_dict.items()]
+    dg = nx.DiGraph()
+    dg.add_weighted_edges_from(construct)
+    return dg
+
 
 
 def remove_paths(graph, path_list, delete_entry_node, delete_sink_node):
