@@ -96,26 +96,91 @@ def build_graph(kmer_dict):
 
 
 def remove_paths(graph, path_list, delete_entry_node, delete_sink_node):
-    pass
+    for path in path_list:
+        for i in range(len(path)):
+            if i == 0 and delete_entry_node:
+                graph.remove_node(path[i])
+            elif i == len(path)-1 and delete_sink_node:
+                graph.remove_node(path[i])
+            elif i not in [0, len(path)-1]:
+                graph.remove_node(path[i])
+    
+    return graph
 
 def std(data):
-    pass
+    return statistics.stdev(data)
 
 
 def select_best_path(graph, path_list, path_length, weight_avg_list, 
                      delete_entry_node=False, delete_sink_node=False):
-    pass
+    best_path = path_list[0]
+    best_path_lenght = path_length[0]
+    best_path_weight = weight_avg_list[0]
+    paths_to_remove = []
+
+    for i in range(1, len(path_list)):
+        if weight_avg_list[i] > best_path_weight:
+            paths_to_remove.append(best_path)
+            best_path = path_list[i]
+            best_path_lenght = path_length[i]
+            best_path_weight = weight_avg_list[i]
+        elif weight_avg_list[i] == best_path_weight:
+            if path_length[i] > best_path_lenght:
+                paths_to_remove.append(best_path)
+                best_path = path_list[i]
+                best_path_lenght = path_length[i]
+                best_path_weight = weight_avg_list[i]
+            else:
+                paths_to_remove.append(path_list[i])
+        else:
+            paths_to_remove.append(path_list[i])
+    return remove_paths(graph, paths_to_remove, delete_entry_node, delete_sink_node)
+
 
 def path_average_weight(graph, path):
-    pass
+    return sum([graph[path[i]][path[i+1]]["weight"] for i in range(len(path)-1)])/(len(path)-1)
 
 def solve_bubble(graph, ancestor_node, descendant_node):
-    pass
+    # get all paths between ancestor node and descendant node
+    paths = [path for path in nx.all_simple_paths(graph, source=ancestor_node, target=descendant_node)]
+    weights = [path_average_weight(graph, path) for path in paths]
+    lenghts = [len(path)-1 for path in paths]
+    # clean bubble
+    graph = select_best_path(graph, paths, lenghts, weights)
+    return graph
 
 def simplify_bubbles(graph):
-    pass
+    def search_for_bubble(graph, nodes):
+        preds = []
+        for node in nodes:
+            preds += [pred for pred in graph.predecessors(node)]
+        if len(set(preds)) != len(preds):
+            uniq = []
+            duplicate = []
+            for pred in preds:
+                if pred not in uniq:
+                    uniq.append(pred)
+                elif pred not in duplicate:
+                    duplicate.append(pred)
+            return duplicate
+        else:
+            return search_for_bubble(graph, preds)
+        
+    nodes_to_check = [node for node, succs in graph.pred.items() if succs]
+    nodes_to_check = [node for node in nodes_to_check if len([pred for pred in graph.predecessors(node)])>1]
+    
+    anc_des_list = []
+    for node in nodes_to_check:
+        ancestors = search_for_bubble(graph, [node])
+        anc_des_list += [[anc, node] for anc in ancestors]
+    
+    for ancestor, descendant in anc_des_list:
+        graph = solve_bubble(graph, ancestor, descendant)
+    
+    return graph
 
 def solve_entry_tips(graph, starting_nodes):
+    
     pass
 
 def solve_out_tips(graph, ending_nodes):
